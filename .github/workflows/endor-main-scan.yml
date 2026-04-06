@@ -1,0 +1,61 @@
+name: Scan multiple repos on push
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  scan-repos:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout scan repo
+        uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get install -y jq
+
+      - name: Download Endorctl
+        run: |
+          curl https://api.endorlabs.com/download/latest/endorctl_linux_amd64 -o endorctl
+          echo "$(curl -s https://api.endorlabs.com/sha/latest/endorctl_linux_amd64)  endorctl" | sha256sum -c
+          if [ $? -ne 0 ]; then 
+            echo "Integrity check failed"
+            exit 1
+          fi
+          chmod +x ./endorctl
+          mkdir -p $HOME/bin
+          mv endorctl $HOME/bin/endorctl
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Scan repositories
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          ENDOR_API_KEY: ${{ secrets.ENDOR_API_KEY }}
+          ENDOR_API_SECRET: ${{ secrets.ENDOR_API_SECRET }}
+        run: |
+          jq -c '.[]' repos.json | while read repo; do
+            NAME=$(echo "$repo" | jq -r '.name')
+            NAMESPACE=$(echo "$repo" | jq -r '.namespace')
+
+            PROJECT_NAME="https://github.com/tejjnayak/$NAME.git"
+
+            echo "🔍 Scanning repo: $NAME"
+            echo "📦 Namespace: $NAMESPACE"
+
+            git clone https://github.com/tejjnayak/$NAME.git
+            cd $NAME
+
+            endorctl scan \
+              --namespace "$NAMESPACE" \
+              --api-key "$ENDOR_API_KEY" \
+              --api-secret "$ENDOR_API_SECRET" \
+              --dependencies
+
+            cd ..
+            rm -rf "$NAME"
+          done
