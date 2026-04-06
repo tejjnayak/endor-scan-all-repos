@@ -1,10 +1,10 @@
 [
   {
     "name": "vulnerable-app",
-    "namespace": "tej-learn"
+    "namespace": "tej-learn.bu-1"
   },
   {
     "name": "python-test-dependency",
-    "namespace": "tej-learn"
+    "namespace": "tej-learn.bu-2"
   }
 ]
